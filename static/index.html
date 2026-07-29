@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoSlide Pro - AI Presentation Builder</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <!-- SweetAlert2 cho thông báo đẹp -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Canvas Confetti cho hiệu ứng pháo hoa -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="container">
+        <!-- Tiêu đề -->
+        <header class="header">
+            <h1>AutoSlide <span class="gradient-text">Pro</span></h1>
+            <p class="text-secondary" style="margin-top: 8px;">Tạo slide chuyên nghiệp với AI theo phong cách của bạn</p>
+        </header>
+
+        <!-- Bố cục Bento Grid -->
+        <main class="bento-grid">
+            
+            <!-- Hộp 1: Tải PDF (To nhất) -->
+            <div class="bento-box box-pdf">
+                <h3>1. Tài liệu học tập (PDF/DOCX)</h3>
+                <p class="text-secondary" style="font-size: 14px; margin-top: 5px;">AI sẽ đọc và trích xuất ý chính từ file này.</p>
+                <div class="dropzone" id="pdf-dropzone">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" stroke-width="1.5" style="margin-bottom: 15px;">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="12" y1="18" x2="12" y2="12"></line>
+                        <line x1="9" y1="15" x2="15" y2="15"></line>
+                    </svg>
+                    <p style="font-weight: 600;">Kéo thả file PDF vào đây</p>
+                    <span class="text-secondary" style="font-size: 13px;">Dung lượng tối đa 20MB</span>
+                </div>
+            </div>
+
+            <!-- Hộp 2: Kịch Bản Thuyết Trình (Mới thêm) -->
+            <div class="bento-box box-script" style="grid-column: span 2; display: none;" id="script-container">
+                <h3>📜 Kịch bản AI soạn thảo</h3>
+                <p class="text-secondary" style="font-size: 14px; margin-top: 5px;">Kiểm tra và chỉnh sửa nội dung trước khi gán vào Slide.</p>
+                <textarea id="script-textarea" style="width: 100%; height: 250px; margin-top: 10px; padding: 10px; font-family: monospace; border: 1px solid var(--border-color); border-radius: 8px; resize: vertical;"></textarea>
+            </div>
+
+            <!-- Hộp 3: Tải Canva Template -->
+            <div class="bento-box box-template" id="template-container" style="display: none;">
+                <h3>2. Mẫu Thiết kế (PPTX)</h3>
+                <p class="text-secondary" style="font-size: 14px; margin-top: 5px;">Tải lên BẤT KỲ mẫu thiết kế nào (Zero-Shot Layout).</p>
+                <div class="dropzone" id="template-dropzone">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--secondary-color)" stroke-width="1.5" style="margin-bottom: 10px;">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                    <p style="font-weight: 600; font-size: 14px;">Kéo thả file .pptx</p>
+                    <span class="text-secondary" style="font-size: 12px;">AI tự nhận diện các hộp chữ</span>
+                </div>
+            </div>
+
+            <!-- Hộp 4: Bảng điều khiển (Nằm ngang dưới cùng) -->
+            <div class="bento-box box-settings">
+                
+                <!-- Nhóm cài đặt -->
+                <div style="flex: 1; display: flex; gap: 30px; align-items: center; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 150px;">
+                        <label style="font-weight: 600; font-size: 14px; display: block; margin-bottom: 5px;">Số lượng Slide: <span id="slide-count">10</span></label>
+                        <input type="range" min="5" max="30" value="10">
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="auto-image" checked style="width: 18px; height: 18px; accent-color: var(--primary-color);">
+                        <label for="auto-image" style="font-weight: 600; font-size: 14px;">Tự động chèn ảnh</label>
+                    </div>
+                </div>
+
+                <!-- Nút Hành động & Trạng thái AI Calm -->
+                <div style="min-width: 250px;">
+                    <!-- Nút Bước 1 -->
+                    <button class="btn-primary" id="btn-generate-script">1. Soạn Kịch Bản</button>
+                    <!-- Nút Bước 2 (Ẩn lúc đầu) -->
+                    <button class="btn-primary" id="btn-generate-pptx" style="display: none; background: linear-gradient(135deg, #10b981 0%, #059669 100%);">2. Lắp Ráp & Tạo Slide</button>
+                    
+                    <!-- Trạng thái lúc Loading (Ẩn đi, chỉ hiện khi bấm nút) -->
+                    <div class="ai-status-container" id="ai-status">
+                        <p class="ai-breathing-text">✨ Đang phân tích tài liệu...</p>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Script nhỏ để Demo hiệu ứng bấm nút AI Calm -->
+    <script src="app.js"></script>
+</body>
+</html>
