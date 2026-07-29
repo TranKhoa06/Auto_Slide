@@ -122,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
         statusText.innerText = "✨ Đang đọc tài liệu & Soạn kịch bản...";
 
         try {
-            const response = await fetch('http://127.0.0.1:8000/generate_script', {
+            const response = await fetch('/generate_script', {
                 method: 'POST',
                 body: formData
             });
@@ -188,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 3500);
 
         try {
-            const response = await fetch('http://127.0.0.1:8000/generate_pptx', {
+            const response = await fetch('/generate_pptx', {
                 method: 'POST',
                 body: formData
             });

@@ -218,3 +218,6 @@ async def api_generate_pptx(
     except Exception as e:
         print("PPTX Error:", str(e))
         raise HTTPException(status_code=500, detail=str(e))
+
+# Phục vụ Frontend HTML
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
