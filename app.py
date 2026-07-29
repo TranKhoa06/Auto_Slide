@@ -78,6 +78,7 @@ Và đây là sơ đồ Không gian (Bounding Boxes) của các khối văn bả
 NHIỆM VỤ CỦA BẠN (ZERO-SHOT LAYOUT MAPPING):
 Hãy nhúng toàn bộ kịch bản vào các slide này. Đối với mỗi slide_index, hãy suy luận xem shape_id nào là Tiêu đề, shape_id nào là Nội dung dựa vào 'original_text' (văn bản gốc của designer trên Canva), tọa độ (y nhỏ là tiêu đề) và kích thước (w, h). 
 TUYỆT ĐỐI KHÔNG nhét nội dung dài (bullet points) vào các hộp chữ vốn là Tiêu đề (dựa theo original_text).
+QUY TẮC QUAN TRỌNG: Tiêu đề (Title) KHÔNG ĐƯỢC QUÁ 30 ký tự. Nội dung (Body) mỗi hộp không được vượt quá 200 ký tự. Nếu nội dung quá dài, BẮT BUỘC phải chia cắt vào các hộp trống khác hoặc đưa vào speaker_notes.
 Nếu slide thiết kế có nhiều text box, hãy mạnh dạn chia nhỏ nội dung kịch bản để phân bổ đều vào các box. Cố gắng tóm tắt gọn gàng để tránh tràn viền. Mọi giải thích dài dòng nhét vào 'speaker_notes'.
 Những shape không dùng đến (như chữ rác Canva), hãy gán chuỗi rỗng "".
 
@@ -127,8 +128,13 @@ def inject_content_to_pptx(template_path: str, mapping_data: list, output_path: 
             original_size = paragraphs[0].runs[0].font.size
             paragraphs[0].runs[0].text = new_text
             # Ép nhỏ font nếu text quá dài để chống tràn
-            if len(new_text) > 100 and original_size:
-                paragraphs[0].runs[0].font.size = int(original_size * 0.6)
+            if original_size:
+                if len(new_text) > 150:
+                    paragraphs[0].runs[0].font.size = int(original_size * 0.4)
+                elif len(new_text) > 60:
+                    paragraphs[0].runs[0].font.size = int(original_size * 0.6)
+                elif len(new_text) > 30 and original_size > 600000: # ~47pt
+                    paragraphs[0].runs[0].font.size = int(original_size * 0.7)
             for r in paragraphs[0].runs[1:]:
                 r.text = ""
         else:
