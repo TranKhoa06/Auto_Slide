@@ -7,3 +7,5 @@ temp/
 *.pptx
 !BAN_MAU.pptx
 .DS_Store
+
+.env
