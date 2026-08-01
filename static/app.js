@@ -1,50 +1,15 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const pdfDropzone = document.getElementById('pdf-dropzone');
-    const templateDropzone = document.getElementById('template-dropzone');
     let pdfFile = null;
-    let templateFile = null;
+    let currentSessionId = "";
+    let currentPdfPath = "";
+    let scriptData = [];
 
-    // Helper function to handle dropzone logic
-    function setupDropzone(dropzone, fileType, callback) {
-        dropzone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropzone.style.borderColor = 'var(--primary-color)';
-            dropzone.style.background = 'rgba(139, 92, 246, 0.05)';
-            dropzone.style.transform = 'scale(1.02)';
-        });
-
-        dropzone.addEventListener('dragleave', () => {
-            dropzone.style.borderColor = 'var(--border-color)';
-            dropzone.style.background = '#f8fafc';
-            dropzone.style.transform = 'scale(1)';
-        });
-
-        dropzone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropzone.style.borderColor = 'var(--border-color)';
-            dropzone.style.background = '#f8fafc';
-            dropzone.style.transform = 'scale(1)';
-            
-            if (e.dataTransfer.files.length) {
-                const file = e.dataTransfer.files[0];
-                if (file.name.toLowerCase().endsWith(fileType)) {
-                    callback(file);
-                    dropzone.querySelector('p').innerText = `Đã chọn: ${file.name}`;
-                    dropzone.querySelector('p').style.color = 'var(--primary-color)';
-                } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Sai định dạng!',
-                        text: `Vui lòng chọn file ${fileType.toUpperCase()}`
-                    });
-                }
-            }
-        });
-
-        // Click to upload
+    // Setup Dropzones
+    function setupDropzone(id, fileType, callback) {
+        const dropzone = document.getElementById(id);
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
-        fileInput.accept = fileType === '.pdf' ? 'application/pdf' : '.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation';
+        fileInput.accept = fileType;
         fileInput.style.display = 'none';
         dropzone.appendChild(fileInput);
 
@@ -53,178 +18,162 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.target.files.length) {
                 const file = e.target.files[0];
                 callback(file);
-                dropzone.querySelector('p').innerText = `Đã chọn: ${file.name}`;
-                dropzone.querySelector('p').style.color = 'var(--primary-color)';
+                const p = dropzone.querySelector('p');
+                p.innerText = `Đã chọn: ${file.name}`;
+                p.style.color = 'var(--primary-color)';
+                dropzone.style.borderColor = 'var(--primary-color)';
             }
         });
     }
 
-    // Setup Dropzones
-    setupDropzone(pdfDropzone, '.pdf', (file) => { pdfFile = file; });
-    setupDropzone(templateDropzone, '.pptx', (file) => { templateFile = file; });
+    setupDropzone('pdf-dropzone', '.pdf,.pptx', (f) => pdfFile = f);
 
-    // Slider sync
-    const slider = document.querySelector('input[type="range"]');
-    const slideCountLabel = document.getElementById('slide-count');
-    slider.addEventListener('input', (e) => {
-        slideCountLabel.innerText = e.target.value;
+    // Sync slider
+    document.getElementById('slide-range').addEventListener('input', (e) => {
+        document.getElementById('slide-count').innerText = e.target.value;
     });
 
-    // Bắn pháo hoa
-    function fireConfetti() {
-        var duration = 3 * 1000;
-        var animationEnd = Date.now() + duration;
-        var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const loadingText = document.getElementById('loading-text');
 
-        function randomInRange(min, max) {
-            return Math.random() * (max - min) + min;
-        }
-
-        var interval = setInterval(function() {
-            var timeLeft = animationEnd - Date.now();
-            if (timeLeft <= 0) {
-                return clearInterval(interval);
-            }
-            var particleCount = 50 * (timeLeft / duration);
-            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
-            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
-        }, 250);
+    function showLoading(msg) {
+        loadingText.innerText = msg;
+        loadingOverlay.style.display = 'flex';
+    }
+    function hideLoading() {
+        loadingOverlay.style.display = 'none';
     }
 
-    // Variables to store session
-    let currentSessionId = "";
-
-    // Elements
-    const btnScript = document.getElementById('btn-generate-script');
-    const btnPptx = document.getElementById('btn-generate-pptx');
-    const statusDiv = document.getElementById('ai-status');
-    const statusText = statusDiv.querySelector('p');
-    const scriptContainer = document.getElementById('script-container');
-    const scriptTextarea = document.getElementById('script-textarea');
-    const templateContainer = document.getElementById('template-container');
-
-    // BƯỚC 1: TẠO KỊCH BẢN
-    btnScript.addEventListener('click', async function() {
-        if (!pdfFile) {
-            Swal.fire('Thiếu dữ liệu', 'Vui lòng tải lên tài liệu học tập (PDF)!', 'warning');
-            return;
-        }
-
-        const slideCount = document.querySelector('input[type="range"]').value;
-        const formData = new FormData();
-        formData.append('pdf_file', pdfFile);
-        formData.append('slide_count', slideCount);
-        formData.append('api_key', '');
-
-        // Loading UI
-        this.style.display = 'none';
-        statusDiv.style.display = 'block';
-        statusText.innerText = "✨ Đang đọc tài liệu & Soạn kịch bản...";
-
+    // STEP 1: Generate Script & Images
+    document.getElementById('btn-generate-script').addEventListener('click', async () => {
+        if (!pdfFile) return Swal.fire('Lỗi', 'Vui lòng chọn file PDF hoặc PPTX', 'warning');
+        const apiKey = document.getElementById('api-key-input').value.trim();
+        if (!apiKey) return Swal.fire('Lỗi', 'Vui lòng nhập Gemini API Key', 'warning');
+        
+        showLoading('✨ Đang phân tích tài liệu & Soạn kịch bản...');
+        
         try {
-            const response = await fetch('/generate_script', {
-                method: 'POST',
-                body: formData
-            });
+            // 1. Soạn kịch bản
+            let fd = new FormData();
+            fd.append('source_file', pdfFile);
+            fd.append('slide_count', document.getElementById('slide-range').value);
+            fd.append('api_key', apiKey);
 
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.detail || 'Lỗi xử lý từ máy chủ');
-            }
-
-            const data = await response.json();
+            let res = await fetch('/generate_script', { method: 'POST', body: fd });
+            if (!res.ok) throw new Error("Lỗi tạo kịch bản");
+            let data = await res.json();
+            
             currentSessionId = data.session_id;
+            currentPdfPath = data.pdf_path;
             
-            // Hiển thị kịch bản
-            scriptTextarea.value = data.script;
-            scriptContainer.style.display = 'block';
-            templateContainer.style.display = 'block';
+            // 2. Lấy hình ảnh (Trích xuất & AI)
+            showLoading('🎨 Đang trích xuất & tạo ảnh AI...');
+            let imgFd = new FormData();
+            imgFd.append('session_id', currentSessionId);
+            imgFd.append('script', data.script);
+            imgFd.append('pdf_path', currentPdfPath);
             
-            // Chuyển nút bấm sang Bước 2
-            statusDiv.style.display = 'none';
-            btnPptx.style.display = 'block';
-
-            Swal.fire({
-                title: 'Kịch bản đã sẵn sàng!',
-                text: 'Hãy kiểm tra nội dung và tải lên Mẫu thiết kế để tạo Slide.',
-                icon: 'success',
-                confirmButtonColor: '#10b981'
-            });
-
-        } catch (error) {
-            Swal.fire('Lỗi', error.message, 'error');
-            this.style.display = 'block';
-            statusDiv.style.display = 'none';
+            let imgRes = await fetch('/generate_images', { method: 'POST', body: imgFd });
+            if (!imgRes.ok) throw new Error("Lỗi tạo ảnh");
+            let imgData = await imgRes.json();
+            
+            scriptData = JSON.parse(imgData.script);
+            renderReviewUI();
+            
+            // Chuyển UI
+            document.getElementById('step1-box').classList.remove('active-step');
+            document.getElementById('step2-box').style.display = 'block';
+            
+            hideLoading();
+            Swal.fire('Thành công', 'Kịch bản và hình ảnh đã sẵn sàng!', 'success');
+            
+        } catch (e) {
+            hideLoading();
+            Swal.fire('Lỗi', e.message, 'error');
         }
     });
 
-    // BƯỚC 2: TẠO SLIDE
-    btnPptx.addEventListener('click', async function() {
-        if (!templateFile) {
-            Swal.fire('Thiếu dữ liệu', 'Vui lòng tải lên Mẫu thiết kế PPTX!', 'warning');
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('session_id', currentSessionId);
-        formData.append('script', scriptTextarea.value);
-        formData.append('template_file', templateFile);
-        formData.append('api_key', '');
-
-        // Loading UI
-        this.style.display = 'none';
-        statusDiv.style.display = 'block';
+    function renderReviewUI() {
+        const container = document.getElementById('review-container');
+        container.innerHTML = '';
         
-        let step = 0;
-        const messages = [
-            "✨ Quét Không gian & Nhận diện Bố cục...",
-            "✨ Đang Lắp ráp Kịch bản vào Không gian...",
-            "✨ Tự động Căn chỉnh Chữ (Auto-Fit)...",
-            "✨ Gần xong rồi, đang lưu file..."
-        ];
-        const msgInterval = setInterval(() => {
-            step++;
-            if(step < messages.length) statusText.innerText = messages[step];
-        }, 3500);
-
-        try {
-            const response = await fetch('/generate_pptx', {
-                method: 'POST',
-                body: formData
-            });
-            clearInterval(msgInterval);
-
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.detail || 'Lỗi xử lý từ máy chủ');
-            }
-
-            statusText.innerText = "🎉 Hoàn tất! Đang tải file xuống...";
+        scriptData.forEach((slide, idx) => {
+            const card = document.createElement('div');
+            card.className = 'slide-review-card';
             
-            // Tải file về
-            const blob = await response.blob();
+            // Left: Text content
+            const textDiv = document.createElement('div');
+            textDiv.innerHTML = `
+                <div style="font-weight:600; color:var(--primary-color)">Slide ${idx+1}</div>
+                <input type="text" style="width:100%; background:transparent; border:none; border-bottom:1px solid #333; color:white; font-size:18px; margin-top:10px" value="${slide.title}">
+                <textarea rows="4">${slide.bullets ? slide.bullets.join('\\n') : ''}</textarea>
+                <textarea rows="2" style="font-size:12px; opacity:0.8" placeholder="Notes...">${slide.speaker_notes}</textarea>
+            `;
+            
+            // Right: Image content
+            const imgDiv = document.createElement('div');
+            const imgSrc = slide.image_url || '';
+            const isAI = slide.image_source === 'ai_generated';
+            
+            imgDiv.innerHTML = `
+                <div style="font-size:12px; margin-bottom:5px; color:#aaa">Minh họa (${isAI ? 'AI tạo' : 'Từ PDF'})</div>
+                <img src="${imgSrc}" class="slide-img-preview" id="img-${idx}" onerror="this.src=''">
+                ${isAI ? `<div class="img-actions">
+                    <button class="btn-small" onclick="regenerateImage(${idx})">Tạo lại</button>
+                    <button class="btn-small" onclick="removeImage(${idx})">Xóa</button>
+                </div>` : ''}
+            `;
+            
+            card.appendChild(textDiv);
+            card.appendChild(imgDiv);
+            container.appendChild(card);
+        });
+    }
+
+    // Global funcs for inline onclick
+    window.regenerateImage = function(idx) {
+        const slide = scriptData[idx];
+        const randomSeed = Math.floor(Math.random() * 100000);
+        const prompt = encodeURIComponent(`Minimalist illustration for presentation slide about ${slide.title}. Modern corporate style, clean background, highly detailed`);
+        const imgUrl = `https://image.pollinations.ai/prompt/${prompt}?width=800&height=600&nologo=true&seed=${randomSeed}`;
+        
+        document.getElementById(`img-${idx}`).src = imgUrl;
+        scriptData[idx].image_url = imgUrl;
+    }
+    window.removeImage = function(idx) {
+        document.getElementById(`img-${idx}`).src = '';
+        scriptData[idx].image_url = '';
+    }
+
+    // BƯỚC 2: TẠO SLIDE
+    document.getElementById('btn-generate-pptx').addEventListener('click', async () => {
+        showLoading('✨ Đang lắp ráp & Căn chỉnh Template Natively...');
+        
+        try {
+            let fd = new FormData();
+            fd.append('session_id', currentSessionId);
+            fd.append('script', JSON.stringify(scriptData));
+            
+            let res = await fetch('/generate_pptx', { method: 'POST', body: fd });
+            if (!res.ok) throw new Error("Lỗi khi tạo PPTX");
+            
+            const blob = await res.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = url;
-            a.download = 'AutoSlide_Result.pptx';
+            a.download = 'AutoSlide_Premium.pptx';
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
-
-            fireConfetti();
-            Swal.fire('Thành công!', 'Slide siêu việt của bạn đã hoàn thành.', 'success');
-
-        } catch (error) {
-            clearInterval(msgInterval);
-            Swal.fire('Lỗi', error.message, 'error');
-            statusText.innerText = "❌ Đã có lỗi xảy ra.";
-        } finally {
-            setTimeout(() => {
-                this.style.display = 'block';
-                statusDiv.style.display = 'none';
-                statusText.innerText = "✨...";
-            }, 3000);
+            
+            hideLoading();
+            confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+            Swal.fire('Hoàn tất!', 'Slide đã được tạo thành công!', 'success');
+            
+        } catch(e) {
+            hideLoading();
+            Swal.fire('Lỗi', e.message, 'error');
         }
     });
 });
