@@ -54,6 +54,7 @@ async def generate_script_content(file_path: str, slide_count: int, api_key: str
     
     script_prompt = f"""Bạn là chuyên gia thiết kế nội dung bài giảng. Dựa vào tài liệu học thuật đính kèm, hãy tạo Kịch bản Thuyết trình gồm đúng {slide_count} Slide.
 YÊU CẦU NGHIÊM NGẶT:
+- GIỮ NGUYÊN NGÔN NGỮ CỦA TÀI LIỆU GỐC (Ví dụ: Nếu tài liệu tiếng Anh, slide phải là tiếng Anh. Tuyệt đối không tự động dịch).
 - Dữ liệu trả về PHẢI là định dạng JSON mảng hợp lệ. KHÔNG bọc bằng markdown json.
 - Mỗi slide chứa 3 trường: "title" (tiêu đề ngắn gọn < 30 ký tự), "bullets" (mảng gồm 3-5 gạch đầu dòng, mỗi gạch đầu dòng KHÔNG QUÁ 100 ký tự), "speaker_notes" (kịch bản chi tiết để người thuyết trình đọc).
 - Cố gắng giữ lại các định nghĩa, công thức, số liệu quan trọng nhất. Đưa các diễn giải dài dòng vào speaker_notes.
